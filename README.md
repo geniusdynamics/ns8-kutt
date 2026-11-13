@@ -1,172 +1,155 @@
-# ns8-kickstart
+# ns8-kutt
 
-This is a template module for [NethServer 8](https://github.com/NethServer/ns8-core).
-To start a new module from it:
+[Kutt](https://github.com/thedevs-network/kutt) URL shortener for
+[NethServer 8](https://github.com/NethServer/ns8-core): short links with
+custom addresses and domains, visit statistics, expiration, password
+protection, a REST API and browser extensions.
 
-1. Click on [Use this template](https://github.com/NethServer/ns8-kickstart/generate).
-   Name your repo with `ns8-` prefix (e.g. `ns8-mymodule`). 
-   Do not end your module name with a number, like ~~`ns8-baaad2`~~!
+The module runs the official images, following Kutt's
+[`docker-compose.postgres.yml`](https://github.com/thedevs-network/kutt/blob/main/docker-compose.postgres.yml):
 
-1. Clone the repository, enter the cloned directory and
-   [configure your GIT identity](https://git-scm.com/book/en/v2/Getting-Started-First-Time-Git-Setup#_your_identity)
+| Container | Image | Role |
+|---|---|---|
+| `kutt-app` | `docker.io/kutt/kutt` | Kutt, port 3000, published on 127.0.0.1 for Traefik |
+| `postgresql-app` | `docker.io/postgres` (alpine) | database, `postgres-data` volume |
+| `redis-app` | `docker.io/redis` (alpine) | cache, no persistence |
 
-1. Rename some references inside the repo:
-   ```
-   modulename=$(basename $(pwd) | sed 's/^ns8-//') &&
-   git mv imageroot/systemd/user/kickstart.service imageroot/systemd/user/${modulename}.service &&
-   git mv imageroot/systemd/user/kickstart-app.service imageroot/systemd/user/${modulename}-app.service && 
-   git mv tests/kickstart.robot tests/${modulename}.robot &&
-   sed -i "s/kickstart/${modulename}/g" $(find .github/ * -type f) &&
-   git commit -a -m "Repository initialization"
-   ```
-
-1. Edit this `README.md` file, by replacing this section with your module
-   description
-
-1. Adjust `.github/workflows` to your needs. `clean-registry.yml` might
-   need the proper list of image names to work correctly. Unused workflows
-   can be disabled from the GitHub Actions interface.
-
-1. Commit and push your local changes
+The image versions are in `build-images.sh`, in the format Renovate reads.
 
 ## Install
 
 Instantiate the module with:
 
-    add-module ghcr.io/nethserver/kickstart:latest 1
+    add-module ghcr.io/geniusdynamics/kutt:latest 1
 
-The output of the command will return the instance name.
-Output example:
+The output of the command returns the instance name:
 
-    {"module_id": "kickstart1", "image_name": "kickstart", "image_url": "ghcr.io/nethserver/kickstart:latest"}
+    {"module_id": "kutt1", "image_name": "kutt", "image_url": "ghcr.io/geniusdynamics/kutt:latest"}
 
 ## Configure
 
-Let's assume that the mattermost instance is named `kickstart1`.
-
-Launch `configure-module`, by setting the following parameters:
-- `host`: a fully qualified domain name for the application
-- `http2https`: enable or disable HTTP to HTTPS redirection (true/false)
-- `lets_encrypt`: enable or disable Let's Encrypt certificate (true/false)
-
-
-Example:
+Configure the instance from the Settings page, or with `configure-module`.
+Only `host` is required; any setting left out keeps its current value (the
+Kutt default on the first configuration).
 
 ```
-api-cli run configure-module --agent module/kickstart1 --data - <<EOF
+api-cli run configure-module --agent module/kutt1 --data - <<EOF
 {
-  "host": "kickstart.domain.com",
+  "host": "kutt.example.org",
   "http2https": true,
-  "lets_encrypt": false
+  "lets_encrypt": false,
+  "site_name": "Kutt",
+  "link_length": 6,
+  "disallow_registration": true,
+  "disallow_anonymous_links": true
 }
 EOF
 ```
 
-The above command will:
-- start and configure the kickstart instance
-- configure a virtual host for trafik to access the instance
+Then open `https://kutt.example.org`: on the first visit Kutt asks to
+create the admin account.
+
+### Settings
+
+The Settings page groups the variables of Kutt's
+[`.example.env`](https://github.com/thedevs-network/kutt/blob/main/.example.env):
+
+| Section | `configure-module` field | Kutt variable | Default |
+|---|---|---|---|
+| Site and links | `site_name` | `SITE_NAME` | `Kutt` |
+| | `link_length` | `LINK_LENGTH` | `6` |
+| | `link_custom_alphabet` | `LINK_CUSTOM_ALPHABET` | without look-alike characters |
+| Access | `disallow_registration` | `DISALLOW_REGISTRATION` | `true` |
+| | `disallow_anonymous_links` | `DISALLOW_ANONYMOUS_LINKS` | `true` |
+| | `disallow_login_form` | `DISALLOW_LOGIN_FORM` | `false`, needs OIDC |
+| | `enable_rate_limit` | `ENABLE_RATE_LIMIT` | `false` |
+| Custom domains | `server_ip_address` | `SERVER_IP_ADDRESS` | empty |
+| | `server_cname_address` | `SERVER_CNAME_ADDRESS` | empty |
+| | `custom_domain_use_https` | `CUSTOM_DOMAIN_USE_HTTPS` | `false` |
+| Contact and e-mail | `mail_from` | `MAIL_FROM` | `<site name> <noreply@<host>>` |
+| | `report_email` | `REPORT_EMAIL` | empty |
+| | `contact_email` | `CONTACT_EMAIL` | empty |
+| OpenID Connect | `oidc_enabled` | `OIDC_ENABLED` | `false` |
+| | `oidc_issuer` | `OIDC_ISSUER` | empty |
+| | `oidc_client_id` | `OIDC_CLIENT_ID` | empty |
+| | `oidc_client_secret` | `OIDC_CLIENT_SECRET` | empty; an empty value keeps the saved secret |
+| | `oidc_scope` | `OIDC_SCOPE` | `openid profile email` |
+| | `oidc_email_claim` | `OIDC_EMAIL_CLAIM` | `email` |
+| | `oidc_prompt` | `OIDC_PROMPT` | empty |
+| | `oidc_button_text` | `OIDC_BUTTON_TEXT` | `Log in with OIDC` |
+
+For OpenID Connect, register `https://<host>/login/oidc` as the redirect URL
+of the Kutt client in the provider.
+
+The module sets the other variables itself:
+
+- `DEFAULT_DOMAIN` is `host`, `PORT` is 3000 and `TRUST_PROXY` is `true`
+  (Traefik passes the visitor address).
+- `DB_*` point to PostgreSQL and `REDIS_*` to Redis, on 127.0.0.1 in the pod.
+- `JWT_SECRET` and the database password are random, generated at install.
+- `MAIL_*` come from the cluster smarthost (see below).
+
+Custom domains need their own Traefik route and certificate: Kutt only
+answers for them once the requests reach it.
+
+### Secrets
+
+The secrets never go to the module environment (Redis):
+
+- `state/passwords.env` (mode 0600): `DB_PASSWORD`, `JWT_SECRET` and
+  `OIDC_CLIENT_SECRET`
+- `state/postgres.env` (mode 0600): the PostgreSQL user, database and
+  password
+- `state/kutt.env` and `state/smarthost.env` (mode 0600): the settings
+  passed to Kutt
+
+`get-configuration` returns `oidc_client_secret_set`, never the secret.
 
 ## Get the configuration
-You can retrieve the configuration with
 
-```
-api-cli run get-configuration --agent module/kickstart1
-```
-
-## Uninstall
-
-To uninstall the instance:
-
-    remove-module --no-preserve kickstart1
-
-## Update
-
-To Update the instance:
-
-    api-cli run update-module --data '{"module_url":"ghcr.io/nethserver/kickstart:latest","instances":["kickstart1"],"force":true}'
+    api-cli run get-configuration --agent module/kutt1
 
 ## Smarthost setting discovery
 
-Some configuration settings, like the smarthost setup, are not part of the
-`configure-module` action input: they are discovered by looking at some
-Redis keys.  To ensure the module is always up-to-date with the
-centralized [smarthost
-setup](https://nethserver.github.io/ns8-core/core/smarthost/) every time
-kickstart starts, the command `bin/discover-smarthost` runs and refreshes
-the `state/smarthost.env` file with fresh values from Redis.
+Kutt sends e-mail for password reset, e-mail verification and link
+reports. Before `kutt-app` starts, `bin/discover-smarthost` writes the
+`MAIL_*` settings from the cluster smarthost to `smarthost.env`. Without a
+smarthost e-mail is off. The `smarthost-changed` event restarts `kutt-app`.
 
-Furthermore if smarthost setup is changed when kickstart is already
-running, the event handler `events/smarthost-changed/10reload_services`
-restarts the main module service.
+## Backup and restore
 
-See also the `systemd/user/kickstart.service` file.
+The backup holds a `pg_dump` of the database (`kutt.pg_dump`), the secrets
+and the `kutt-custom` volume (custom styles and images in `/kutt/custom`).
+Restore loads the dump into a new database and configures the instance with
+the saved settings. Let's Encrypt stays off after a restore or a clone,
+because the DNS name may not point to the new node yet; turn it on again
+from the Settings page.
 
-This setting discovery is just an example to understand how the module is
-expected to work: it can be rewritten or discarded completely.
+## Update
+
+    api-cli run update-module --data '{"module_url":"ghcr.io/geniusdynamics/kutt:latest","instances":["kutt1"],"force":true}'
+
+Kutt runs its database migrations at every start.
+
+## Uninstall
+
+    remove-module --no-preserve kutt1
 
 ## Debug
 
-some CLI are needed to debug
+    runagent -m kutt1 env
+    runagent -m kutt1 podman ps
+    runagent -m kutt1 podman logs kutt-app
+    journalctl -t kutt1
 
-- The module runs under an agent that initiate a lot of environment variables (in /home/kickstart1/.config/state), it could be nice to verify them
-on the root terminal
-
-    `runagent -m kickstart1 env`
-
-- you can become runagent for testing scripts and initiate all environment variables
-  
-    `runagent -m kickstart1`
-
- the path become : 
-```
-    echo $PATH
-    /home/kickstart1/.config/bin:/usr/local/agent/pyenv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/usr/
-```
-
-- if you want to debug a container or see environment inside
- `runagent -m kickstart1`
- ```
-podman ps
-CONTAINER ID  IMAGE                                      COMMAND               CREATED        STATUS        PORTS                    NAMES
-d292c6ff28e9  localhost/podman-pause:4.6.1-1702418000                          9 minutes ago  Up 9 minutes  127.0.0.1:20015->80/tcp  80b8de25945f-infra
-d8df02bf6f4a  docker.io/library/postgres:15.5-alpine3.19          --character-set-s...  9 minutes ago  Up 9 minutes  127.0.0.1:20015->80/tcp  postgresql-app
-9e58e5bd676f  docker.io/library/nginx:stable-alpine3.17  nginx -g daemon o...  9 minutes ago  Up 9 minutes  127.0.0.1:20015->80/tcp  kickstart-app
-```
-
-you can see what environment variable is inside the container
-```
-podman exec  kickstart-app env
-TERM=xterm
-container=podman
-NGINX_VERSION=1.24.0
-PKG_RELEASE=1
-NJS_VERSION=0.7.12
-NGINX_IMAGE=docker.io/nginx:stable-alpine3.17
-CONFIG_DATABASE_URI="postgresql://postgres:Nethesis,1234@127.0.0.1:5432/toto"
-PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-HOME=/root
-```
-
-you can run a shell inside the container
-
-```
-podman exec -ti   kickstart-app sh
-/ # 
-```
 ## Testing
 
-Test the module using the `test-module.sh` script:
+The QEMU suite in `tests/` installs, configures and removes the module, and
+checks that Kutt answers through Traefik and that the secrets stay out of
+the environment. To run it on a node:
 
-
-    ./test-module.sh <NODE_ADDR> ghcr.io/nethserver/kickstart:latest
-
-The tests are made using [Robot Framework](https://robotframework.org/)
+    ./test-module.sh <NODE_ADDR> ghcr.io/geniusdynamics/kutt:latest
 
 ## UI translation
 
 Translated with [Weblate](https://hosted.weblate.org/projects/ns8/).
-
-To setup the translation process:
-
-- add [GitHub Weblate app](https://docs.weblate.org/en/latest/admin/continuous.html#github-setup) to your repository
-- add your repository to [hosted.weblate.org]((https://hosted.weblate.org) or ask a NethServer developer to add it to ns8 Weblate project

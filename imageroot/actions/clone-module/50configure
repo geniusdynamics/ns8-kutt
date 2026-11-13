@@ -1,0 +1,24 @@
+#!/usr/bin/env python3
+
+#
+# Copyright (C) 2026 Genius Dynamics
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+
+#
+# The clone already has the state directory, the volumes and the KUTT_*
+# settings of the source: configure-module keeps the settings it is not
+# given. Let's Encrypt stays off: the DNS name may not point to this node.
+#
+
+import os
+
+import agent
+import agent.tasks
+
+ret = agent.tasks.run(agent_id=os.environ["AGENT_ID"], action="configure-module", data={
+    "host": os.environ["TRAEFIK_HOST"],
+    "http2https": os.environ.get("TRAEFIK_HTTP2HTTPS", "True").lower() == "true",
+    "lets_encrypt": False,
+})
+agent.assert_exp(ret["exit_code"] == 0, "The configure-module subtask failed!")

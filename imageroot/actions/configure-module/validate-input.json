@@ -1,13 +1,39 @@
 {
     "$schema": "http://json-schema.org/draft-07/schema#",
-    "title": "Configure kickstart",
-    "$id": "http://nethserver.org/json-schema/task/input/kickstart/configure-module",
-    "description": "Configure kickstart",
+    "title": "Configure Kutt",
+    "$id": "http://nethserver.org/json-schema/task/input/kutt/configure-module",
+    "description": "Configure the Kutt URL shortener. Settings left out keep their current value.",
     "examples": [
         {
-            "host": "kickstart.domain.org",
+            "host": "kutt.domain.org",
             "http2https": true,
             "lets_encrypt": true
+        },
+        {
+            "host": "kutt.domain.org",
+            "http2https": true,
+            "lets_encrypt": false,
+            "site_name": "Kutt",
+            "link_length": 6,
+            "link_custom_alphabet": "abcdefghkmnpqrstuvwxyzABCDEFGHKLMNPQRSTUVWXYZ23456789",
+            "disallow_registration": true,
+            "disallow_login_form": false,
+            "disallow_anonymous_links": true,
+            "server_ip_address": "",
+            "server_cname_address": "",
+            "custom_domain_use_https": false,
+            "enable_rate_limit": true,
+            "report_email": "abuse@domain.org",
+            "contact_email": "support@domain.org",
+            "mail_from": "",
+            "oidc_enabled": true,
+            "oidc_issuer": "https://sso.domain.org/realms/main",
+            "oidc_client_id": "kutt",
+            "oidc_client_secret": "s3cret",
+            "oidc_scope": "openid profile email",
+            "oidc_email_claim": "email",
+            "oidc_prompt": "",
+            "oidc_button_text": "Log in with SSO"
         }
     ],
     "type": "object",
@@ -17,7 +43,7 @@
     "properties": {
         "host": {
             "type": "string",
-            "description": "Host name for the application, like 'kickstart.domain.org'",
+            "description": "Host name of the short links, like 'kutt.domain.org'",
             "format": "hostname",
             "pattern": "\\."
         },
@@ -30,6 +56,107 @@
             "type": "boolean",
             "title": "HTTP to HTTPS redirection",
             "description": "Redirect all the HTTP requests to HTTPS"
+        },
+        "site_name": {
+            "type": "string",
+            "description": "Name of the site shown by Kutt (SITE_NAME)",
+            "minLength": 1,
+            "maxLength": 64
+        },
+        "link_length": {
+            "type": "integer",
+            "description": "Length of the generated short addresses (LINK_LENGTH)",
+            "minimum": 3,
+            "maximum": 32
+        },
+        "link_custom_alphabet": {
+            "type": "string",
+            "description": "Characters of the generated short addresses (LINK_CUSTOM_ALPHABET)",
+            "pattern": "^[A-Za-z0-9_-]{10,}$"
+        },
+        "disallow_registration": {
+            "type": "boolean",
+            "description": "Disable the sign-up of new users (DISALLOW_REGISTRATION)"
+        },
+        "disallow_login_form": {
+            "type": "boolean",
+            "description": "Hide the e-mail and password login form, leaving OIDC login (DISALLOW_LOGIN_FORM)"
+        },
+        "disallow_anonymous_links": {
+            "type": "boolean",
+            "description": "Allow only logged-in users to create links (DISALLOW_ANONYMOUS_LINKS)"
+        },
+        "server_ip_address": {
+            "type": "string",
+            "description": "IP address shown to users who add a custom domain (SERVER_IP_ADDRESS)",
+            "maxLength": 64
+        },
+        "server_cname_address": {
+            "type": "string",
+            "description": "Host name shown to users who add a custom domain, for a CNAME record (SERVER_CNAME_ADDRESS)",
+            "maxLength": 253
+        },
+        "custom_domain_use_https": {
+            "type": "boolean",
+            "description": "Use HTTPS in the short links of custom domains (CUSTOM_DOMAIN_USE_HTTPS)"
+        },
+        "enable_rate_limit": {
+            "type": "boolean",
+            "description": "Rate-limit some API routes (ENABLE_RATE_LIMIT)"
+        },
+        "report_email": {
+            "type": "string",
+            "description": "Address that receives the reports of malicious links (REPORT_EMAIL)",
+            "anyOf": [{"maxLength": 0}, {"format": "email"}]
+        },
+        "contact_email": {
+            "type": "string",
+            "description": "Support address shown by Kutt (CONTACT_EMAIL)",
+            "anyOf": [{"maxLength": 0}, {"format": "email"}]
+        },
+        "mail_from": {
+            "type": "string",
+            "description": "Sender of the Kutt e-mails, like 'Kutt <noreply@domain.org>' (MAIL_FROM). Empty: the site name at noreply@<host>.",
+            "maxLength": 255
+        },
+        "oidc_enabled": {
+            "type": "boolean",
+            "description": "Log in with an OpenID Connect provider (OIDC_ENABLED)"
+        },
+        "oidc_issuer": {
+            "type": "string",
+            "description": "Issuer URL of the OpenID Connect provider (OIDC_ISSUER)",
+            "anyOf": [{"maxLength": 0}, {"pattern": "^https?://"}]
+        },
+        "oidc_client_id": {
+            "type": "string",
+            "description": "OpenID Connect client ID (OIDC_CLIENT_ID)",
+            "maxLength": 255
+        },
+        "oidc_client_secret": {
+            "type": "string",
+            "description": "OpenID Connect client secret (OIDC_CLIENT_SECRET). Empty: keep the current secret.",
+            "maxLength": 1024
+        },
+        "oidc_scope": {
+            "type": "string",
+            "description": "OpenID Connect scopes (OIDC_SCOPE)",
+            "maxLength": 255
+        },
+        "oidc_email_claim": {
+            "type": "string",
+            "description": "Claim that holds the user e-mail address (OIDC_EMAIL_CLAIM)",
+            "maxLength": 64
+        },
+        "oidc_prompt": {
+            "type": "string",
+            "description": "OpenID Connect prompt parameter, like 'login' or 'consent' (OIDC_PROMPT)",
+            "maxLength": 64
+        },
+        "oidc_button_text": {
+            "type": "string",
+            "description": "Text of the OpenID Connect login button (OIDC_BUTTON_TEXT)",
+            "maxLength": 64
         }
     }
 }

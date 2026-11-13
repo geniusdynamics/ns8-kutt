@@ -1,0 +1,53 @@
+#!/usr/bin/env python3
+
+#
+# Copyright (C) 2026 Genius Dynamics
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+
+#
+# Configure the restored instance with every setting of the backup. Let's
+# Encrypt stays off: the DNS name may not point to this node yet. The OIDC
+# client secret is already in the restored passwords.env.
+#
+
+import json
+import os
+import sys
+
+import agent
+import agent.tasks
+
+renv = json.load(sys.stdin)["environment"]
+
+
+def flag(name, default):
+    return renv.get(name, default).lower() == "true"
+
+
+data = {
+    "host": renv["TRAEFIK_HOST"],
+    "http2https": flag("TRAEFIK_HTTP2HTTPS", "True"),
+    "lets_encrypt": False,
+}
+for key, name in (
+    ("site_name", "SITE_NAME"), ("link_custom_alphabet", "LINK_CUSTOM_ALPHABET"),
+    ("server_ip_address", "SERVER_IP_ADDRESS"), ("server_cname_address", "SERVER_CNAME_ADDRESS"),
+    ("report_email", "REPORT_EMAIL"), ("contact_email", "CONTACT_EMAIL"), ("mail_from", "MAIL_FROM"),
+    ("oidc_issuer", "OIDC_ISSUER"), ("oidc_client_id", "OIDC_CLIENT_ID"), ("oidc_scope", "OIDC_SCOPE"),
+    ("oidc_email_claim", "OIDC_EMAIL_CLAIM"), ("oidc_prompt", "OIDC_PROMPT"), ("oidc_button_text", "OIDC_BUTTON_TEXT"),
+):
+    if "KUTT_" + name in renv:
+        data[key] = renv["KUTT_" + name]
+for key, name in (
+    ("disallow_registration", "DISALLOW_REGISTRATION"), ("disallow_login_form", "DISALLOW_LOGIN_FORM"),
+    ("disallow_anonymous_links", "DISALLOW_ANONYMOUS_LINKS"), ("custom_domain_use_https", "CUSTOM_DOMAIN_USE_HTTPS"),
+    ("enable_rate_limit", "ENABLE_RATE_LIMIT"), ("oidc_enabled", "OIDC_ENABLED"),
+):
+    if "KUTT_" + name in renv:
+        data[key] = flag("KUTT_" + name, "false")
+if renv.get("KUTT_LINK_LENGTH", "").isdigit():
+    data["link_length"] = int(renv["KUTT_LINK_LENGTH"])
+
+ret = agent.tasks.run(agent_id=os.environ["AGENT_ID"], action="configure-module", data=data)
+agent.assert_exp(ret["exit_code"] == 0, "The configure-module subtask failed!")
