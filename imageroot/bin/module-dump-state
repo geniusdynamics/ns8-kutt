@@ -1,11 +1,17 @@
 #!/bin/bash
 
 #
-# Copyright (C) 2022 Nethesis S.r.l.
+# Copyright (C) 2026 Genius Dynamics
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 
-set -e
+# Before a backup: dump the Kutt database in the PostgreSQL custom format,
+# restored by restore-module/40restore_database.
 
-echo "Dumping kickstart postgres database"
-podman exec postgresql-app pg_dump -U postgres --format=c  kickstart > kickstart.pg_dump
+set -e -o pipefail
+
+if ! systemctl --user -q is-active kutt.service; then
+    exit 0
+fi
+echo "Dumping the kutt database" 1>&2
+podman exec postgresql-app pg_dump -U kutt --format=c kutt > kutt.pg_dump

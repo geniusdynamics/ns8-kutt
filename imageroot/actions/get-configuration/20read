@@ -1,26 +1,76 @@
 #!/usr/bin/env python3
 
 #
-# Copyright (C) 2022 Nethesis S.r.l.
+# Copyright (C) 2026 Genius Dynamics
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 
 #
-# Read configuration
+# Return the settings of configure-module. Every reader of the module can
+# run this action: it never returns a secret, only whether the OIDC client
+# secret is set.
 #
 
+import json
 import os
 import sys
-import json
+
 import agent
 
-# Prepare return variable
-config = {}
+STR = {
+    "site_name": ("SITE_NAME", "Kutt"),
+    "link_custom_alphabet": ("LINK_CUSTOM_ALPHABET", "abcdefghkmnpqrstuvwxyzABCDEFGHKLMNPQRSTUVWXYZ23456789"),
+    "server_ip_address": ("SERVER_IP_ADDRESS", ""),
+    "server_cname_address": ("SERVER_CNAME_ADDRESS", ""),
+    "report_email": ("REPORT_EMAIL", ""),
+    "contact_email": ("CONTACT_EMAIL", ""),
+    "mail_from": ("MAIL_FROM", ""),
+    "oidc_issuer": ("OIDC_ISSUER", ""),
+    "oidc_client_id": ("OIDC_CLIENT_ID", ""),
+    "oidc_scope": ("OIDC_SCOPE", "openid profile email"),
+    "oidc_email_claim": ("OIDC_EMAIL_CLAIM", "email"),
+    "oidc_prompt": ("OIDC_PROMPT", ""),
+    "oidc_button_text": ("OIDC_BUTTON_TEXT", "Log in with OIDC"),
+}
+BOOL = {
+    "disallow_registration": ("DISALLOW_REGISTRATION", True),
+    "disallow_login_form": ("DISALLOW_LOGIN_FORM", False),
+    "disallow_anonymous_links": ("DISALLOW_ANONYMOUS_LINKS", True),
+    "custom_domain_use_https": ("CUSTOM_DOMAIN_USE_HTTPS", False),
+    "enable_rate_limit": ("ENABLE_RATE_LIMIT", False),
+    "oidc_enabled": ("OIDC_ENABLED", False),
+}
 
-# Read current configuration from the environment file
-config["host"] = os.getenv("TRAEFIK_HOST","")
-config["http2https"] = os.getenv("TRAEFIK_HTTP2HTTPS") == "True"
-config["lets_encrypt"] = agent.get_route(os.environ['MODULE_ID']).get('lets_encrypt', False)
+config = {
+    "host": os.getenv("TRAEFIK_HOST", ""),
+    "http2https": os.getenv("TRAEFIK_HTTP2HTTPS", "True").lower() == "true",
+    "lets_encrypt": False,
+}
+if config["host"]:
+    route = agent.get_route(os.environ["MODULE_ID"]) or {}
+    config["lets_encrypt"] = bool(route.get("lets_encrypt", False))
 
-# Dump the configuration to stdout
+for key, (name, default) in STR.items():
+    config[key] = os.getenv("KUTT_" + name, default)
+for key, (name, default) in BOOL.items():
+    value = os.getenv("KUTT_" + name)
+    config[key] = default if value is None else value.lower() == "true"
+try:
+    config["link_length"] = int(os.getenv("KUTT_LINK_LENGTH", "6"))
+except ValueError:
+    config["link_length"] = 6
+
+secret_set = False
+if os.path.exists("passwords.env"):
+    secret_set = bool(agent.read_envfile("passwords.env").get("OIDC_CLIENT_SECRET"))
+config["oidc_client_secret_set"] = secret_set
+
+# The smarthost settings of the cluster, for the page to say whether Kutt
+# can send e-mail (password reset, e-mail verification, reports)
+try:
+    rdb = agent.redis_connect(use_replica=True)
+    config["mail_enabled"] = bool(agent.get_smarthost_settings(rdb).get("enabled"))
+except Exception:
+    config["mail_enabled"] = False
+
 json.dump(config, fp=sys.stdout)

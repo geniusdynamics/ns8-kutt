@@ -1,37 +1,40 @@
 #!/bin/bash
 
 #
-# Copyright (C) 2022 Nethesis S.r.l.
+# Copyright (C) 2026 Genius Dynamics
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 
+#
+# Load the kutt.pg_dump of the backup into a new postgres-data volume: a
+# temporary PostgreSQL creates the database (postgres.env), runs the script
+# below from its init directory with the dump on stdin, then stops.
+#
+
 set -e -o pipefail
-exec 1>&2 # Redirect any output to the journal (stderr)
+exec 1>&2
+
+if [[ ! -f kutt.pg_dump ]]; then
+    echo "No kutt.pg_dump in the backup: Kutt starts with an empty database"
+    exit 0
+fi
 
 mkdir -vp restore
-cat - >restore/kickstart_restore.sh <<'EOS'
-# Read dump file from standard input:
-pg_restore --no-owner --no-privileges -U postgres -d kickstart
+cat - >restore/kutt_restore.sh <<'EOS'
+pg_restore --no-owner --no-privileges -U kutt -d kutt
 ec=$?
 docker_temp_server_stop
 exit $ec
 EOS
-
-# Override the image /docker-entrypoint-initdb.d contents, to restore the
-# DB dump file. The container will be stopped at the end
+trap 'rm -rfv restore/ kutt.pg_dump' EXIT
 
 podman run \
     --rm \
     --interactive \
     --network=none \
     --volume=./restore:/docker-entrypoint-initdb.d/:Z \
-    --volume=postgres-data:/var/lib/postgresql/data:Z \
-    --replace --name=restore_db \
-    --env POSTGRES_USER=postgres \
-    --env POSTGRES_PASSWORD=Nethesis,1234 \
-    --env POSTGRES_DB=kickstart \
+    --volume=postgres-data:/var/lib/postgresql:Z \
+    --env-file=postgres.env \
     --env TZ=UTC \
-    "${POSTGRES_IMAGE}" < kickstart.pg_dump
-
-# If the restore is successful, clean up:
-rm -rfv restore/ kickstart.pg_dump
+    --replace --name=restore_db \
+    "${POSTGRES_IMAGE}" < kutt.pg_dump

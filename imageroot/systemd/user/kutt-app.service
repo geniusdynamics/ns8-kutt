@@ -1,0 +1,42 @@
+#
+# Copyright (C) 2026 Genius Dynamics
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+
+#
+# Kutt runs its database migrations, then serves on port 3000.
+# - kutt.env: settings written by configure-module
+# - passwords.env (0600): DB_PASSWORD, JWT_SECRET, OIDC_CLIENT_SECRET
+# - smarthost.env (0600): MAIL_* settings from the NS8 smarthost
+# The kutt-custom volume holds the custom styles and images of /kutt/custom.
+#
+[Unit]
+Description=Podman kutt-app.service
+BindsTo=kutt.service
+After=kutt.service postgresql-app.service redis-app.service
+
+[Service]
+Environment=PODMAN_SYSTEMD_UNIT=%n
+EnvironmentFile=%S/state/environment
+WorkingDirectory=%S/state
+Restart=always
+RestartSec=10
+TimeoutStopSec=70
+ExecStartPre=/bin/rm -f %t/kutt-app.pid %t/kutt-app.ctr-id
+ExecStartPre=-runagent discover-smarthost
+ExecStart=/usr/bin/podman run --conmon-pidfile %t/kutt-app.pid \
+    --cidfile %t/kutt-app.ctr-id --cgroups=no-conmon \
+    --pod-id-file %t/kutt.pod-id --replace -d --name kutt-app \
+    --volume kutt-custom:/kutt/custom:Z \
+    --env-file=%S/state/kutt.env \
+    --env-file=%S/state/passwords.env \
+    --env-file=%S/state/smarthost.env \
+    ${KUTT_IMAGE}
+ExecStop=/usr/bin/podman stop --ignore --cidfile %t/kutt-app.ctr-id -t 10
+ExecStopPost=/usr/bin/podman rm --ignore -f --cidfile %t/kutt-app.ctr-id
+SyslogIdentifier=%u
+PIDFile=%t/kutt-app.pid
+Type=forking
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,34 @@
+#
+# Copyright (C) 2026 Genius Dynamics
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+
+#
+# Pod of the Kutt URL shortener: PostgreSQL, Redis and Kutt share its
+# network and reach each other on 127.0.0.1. Only Kutt (port 3000) is
+# published, on the loopback interface, for Traefik.
+#
+[Unit]
+Description=Podman kutt.service
+Requires=postgresql-app.service redis-app.service kutt-app.service
+Before=postgresql-app.service redis-app.service kutt-app.service
+
+[Service]
+Environment=PODMAN_SYSTEMD_UNIT=%n
+EnvironmentFile=-%S/state/environment
+Restart=always
+TimeoutStopSec=70
+ExecStartPre=/bin/rm -f %t/kutt.pid %t/kutt.pod-id
+ExecStartPre=/usr/bin/podman pod create --infra-conmon-pidfile %t/kutt.pid \
+    --pod-id-file %t/kutt.pod-id \
+    --name kutt \
+    --publish 127.0.0.1:${TCP_PORT}:3000 \
+    --replace
+ExecStart=/usr/bin/podman pod start --pod-id-file %t/kutt.pod-id
+ExecStop=/usr/bin/podman pod stop --ignore --pod-id-file %t/kutt.pod-id -t 10
+ExecStopPost=/usr/bin/podman pod rm --ignore -f --pod-id-file %t/kutt.pod-id
+PIDFile=%t/kutt.pid
+Type=forking
+
+[Install]
+WantedBy=default.target

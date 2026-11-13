@@ -1,36 +1,144 @@
 {
     "$schema": "http://json-schema.org/draft-07/schema#",
-    "title": "Get kickstart settings",
-    "$id": "http://nethserver.org/json-schema/task/input/kickstart/get-configuration",
-    "description": "Get kickstart settings",
+    "title": "Get Kutt settings",
+    "$id": "http://nethserver.org/json-schema/task/output/kutt/get-configuration",
+    "description": "Settings of the Kutt module. Secrets are never returned.",
     "examples": [
         {
-            "host": "kickstart.domain.org",
+            "host": "kutt.domain.org",
             "http2https": true,
-            "lets_encrypt": true
+            "lets_encrypt": false,
+            "site_name": "Kutt",
+            "link_length": 6,
+            "link_custom_alphabet": "abcdefghkmnpqrstuvwxyzABCDEFGHKLMNPQRSTUVWXYZ23456789",
+            "disallow_registration": true,
+            "disallow_login_form": false,
+            "disallow_anonymous_links": true,
+            "server_ip_address": "",
+            "server_cname_address": "",
+            "custom_domain_use_https": false,
+            "enable_rate_limit": false,
+            "report_email": "",
+            "contact_email": "",
+            "mail_from": "",
+            "mail_enabled": false,
+            "oidc_enabled": false,
+            "oidc_issuer": "",
+            "oidc_client_id": "",
+            "oidc_client_secret_set": false,
+            "oidc_scope": "openid profile email",
+            "oidc_email_claim": "email",
+            "oidc_prompt": "",
+            "oidc_button_text": "Log in with OIDC"
         }
     ],
     "type": "object",
     "required": [
         "host",
         "http2https",
-        "lets_encrypt"
+        "lets_encrypt",
+        "site_name",
+        "link_length",
+        "link_custom_alphabet",
+        "disallow_registration",
+        "disallow_login_form",
+        "disallow_anonymous_links",
+        "server_ip_address",
+        "server_cname_address",
+        "custom_domain_use_https",
+        "enable_rate_limit",
+        "report_email",
+        "contact_email",
+        "mail_from",
+        "mail_enabled",
+        "oidc_enabled",
+        "oidc_issuer",
+        "oidc_client_id",
+        "oidc_client_secret_set",
+        "oidc_scope",
+        "oidc_email_claim",
+        "oidc_prompt",
+        "oidc_button_text"
     ],
     "properties": {
         "host": {
             "type": "string",
-            "description": "Host name for the application, like 'kickstart.domain.org'",
-            "format": "idn-hostname"
-        },
-        "lets_encrypt": {
-            "type": "boolean",
-            "title": "Let's Encrypt certificate",
-            "description": "Request a valid Let's Encrypt certificate."
+            "description": "Host name of the short links"
         },
         "http2https": {
+            "type": "boolean"
+        },
+        "lets_encrypt": {
+            "type": "boolean"
+        },
+        "site_name": {
+            "type": "string"
+        },
+        "link_length": {
+            "type": "integer"
+        },
+        "link_custom_alphabet": {
+            "type": "string"
+        },
+        "disallow_registration": {
+            "type": "boolean"
+        },
+        "disallow_login_form": {
+            "type": "boolean"
+        },
+        "disallow_anonymous_links": {
+            "type": "boolean"
+        },
+        "server_ip_address": {
+            "type": "string"
+        },
+        "server_cname_address": {
+            "type": "string"
+        },
+        "custom_domain_use_https": {
+            "type": "boolean"
+        },
+        "enable_rate_limit": {
+            "type": "boolean"
+        },
+        "report_email": {
+            "type": "string"
+        },
+        "contact_email": {
+            "type": "string"
+        },
+        "mail_from": {
+            "type": "string"
+        },
+        "mail_enabled": {
             "type": "boolean",
-            "title": "HTTP to HTTPS redirection",
-            "description": "Redirect all the HTTP requests to HTTPS"
+            "description": "The cluster smarthost is enabled: Kutt can send e-mail"
+        },
+        "oidc_enabled": {
+            "type": "boolean"
+        },
+        "oidc_issuer": {
+            "type": "string"
+        },
+        "oidc_client_id": {
+            "type": "string"
+        },
+        "oidc_client_secret_set": {
+            "type": "boolean",
+            "description": "An OIDC client secret is saved. The secret itself is never returned."
+        },
+        "oidc_scope": {
+            "type": "string"
+        },
+        "oidc_email_claim": {
+            "type": "string"
+        },
+        "oidc_prompt": {
+            "type": "string"
+        },
+        "oidc_button_text": {
+            "type": "string"
         }
-    }
+    },
+    "additionalProperties": false
 }

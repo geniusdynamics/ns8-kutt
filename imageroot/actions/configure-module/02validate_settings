@@ -1,0 +1,51 @@
+#!/usr/bin/env python3
+
+#
+# Copyright (C) 2026 Genius Dynamics
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+
+#
+# Checks across settings that the JSON schema cannot express. Kutt refuses
+# to start with OIDC enabled and a missing value, and with the login form
+# hidden and OIDC off nobody could log in.
+#
+
+import json
+import os
+import sys
+
+import agent
+
+agent.set_weight(os.path.basename(__file__), 0)  # validation step, no progress
+
+data = json.load(sys.stdin)
+
+
+def current(key, name, default):
+    """Value of the request, else the saved setting, else the default"""
+    if key in data:
+        value = data[key]
+        return value if not isinstance(value, bool) else ("true" if value else "false")
+    return os.environ.get("KUTT_" + name, default)
+
+
+errors = []
+oidc_enabled = current("oidc_enabled", "OIDC_ENABLED", "false") == "true"
+if oidc_enabled:
+    for key, name in (("oidc_issuer", "OIDC_ISSUER"), ("oidc_client_id", "OIDC_CLIENT_ID")):
+        if not str(current(key, name, "")).strip():
+            errors.append({"field": key, "parameter": key, "value": "", "error": "required_with_oidc"})
+    has_secret = bool(data.get("oidc_client_secret"))
+    if not has_secret and os.path.exists("passwords.env"):
+        has_secret = bool(agent.read_envfile("passwords.env").get("OIDC_CLIENT_SECRET"))
+    if not has_secret:
+        errors.append({"field": "oidc_client_secret", "parameter": "oidc_client_secret", "value": "", "error": "required_with_oidc"})
+
+if current("disallow_login_form", "DISALLOW_LOGIN_FORM", "false") == "true" and not oidc_enabled:
+    errors.append({"field": "disallow_login_form", "parameter": "disallow_login_form", "value": True, "error": "login_form_needs_oidc"})
+
+if errors:
+    agent.set_status("validation-failed")
+    json.dump(errors, fp=sys.stdout)
+    sys.exit(3)

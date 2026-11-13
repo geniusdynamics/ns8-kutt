@@ -1,19 +1,21 @@
 {
-  "name": "kickstart",
+  "name": "kutt",
   "description": {
-    "en": "My kickstart module"
+    "en": "Kutt URL shortener: short links with custom domains, statistics, password protection and an API"
   },
-  "categories": [],
+  "categories": [
+    "collaboration"
+  ],
   "authors": [
     {
-      "name": "Name Surname",
-      "email": "author@yourmail.org"
+      "name": "Genius Dynamics",
+      "email": "support@genius.ke"
     }
   ],
   "docs": {
-    "documentation_url": "https://docs.kickstart.com/",
-    "bug_url": "https://github.com/NethServer/dev",
-    "code_url": "https://github.com/author/ns8-kickstart"
+    "documentation_url": "https://github.com/geniusdynamics/ns8-kutt#readme",
+    "bug_url": "https://github.com/geniusdynamics/ns8-kutt/issues",
+    "code_url": "https://github.com/geniusdynamics/ns8-kutt"
   },
-  "source": "ghcr.io/nethserver/kickstart"
+  "source": "ghcr.io/geniusdynamics/kutt"
 }

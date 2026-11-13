@@ -1,40 +1,113 @@
 #!/usr/bin/env python3
 
 #
-# Copyright (C) 2022 Nethesis S.r.l.
+# Copyright (C) 2026 Genius Dynamics
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 
+#
+# Save the Kutt settings and write kutt.env, read by the kutt-app container.
+#
+# - Each setting is kept in the module environment as KUTT_<NAME>, so
+#   get-configuration, restore and clone find it again. A setting left out
+#   of the request keeps its current value (or the Kutt default).
+# - The OIDC client secret goes to passwords.env (mode 0600), never to the
+#   environment: an empty value keeps the current secret.
+# - The module manages the database, Redis, the port, the domain and the
+#   proxy settings; bin/discover-smarthost writes the mail settings.
+#
+
 import json
+import os
 import sys
+
 import agent
 
-# Try to parse the stdin as JSON.
-# If parsing fails, output everything to stderr
 data = json.load(sys.stdin)
-# Setup default values
-host = data.get("host")
-h2hs = data.get("http2https", True)
 
+# input key: (Kutt variable, type, default)
+SETTINGS = {
+    "site_name": ("SITE_NAME", str, "Kutt"),
+    "link_length": ("LINK_LENGTH", int, 6),
+    "link_custom_alphabet": ("LINK_CUSTOM_ALPHABET", str, "abcdefghkmnpqrstuvwxyzABCDEFGHKLMNPQRSTUVWXYZ23456789"),
+    "disallow_registration": ("DISALLOW_REGISTRATION", bool, True),
+    "disallow_login_form": ("DISALLOW_LOGIN_FORM", bool, False),
+    "disallow_anonymous_links": ("DISALLOW_ANONYMOUS_LINKS", bool, True),
+    "server_ip_address": ("SERVER_IP_ADDRESS", str, ""),
+    "server_cname_address": ("SERVER_CNAME_ADDRESS", str, ""),
+    "custom_domain_use_https": ("CUSTOM_DOMAIN_USE_HTTPS", bool, False),
+    "enable_rate_limit": ("ENABLE_RATE_LIMIT", bool, False),
+    "report_email": ("REPORT_EMAIL", str, ""),
+    "contact_email": ("CONTACT_EMAIL", str, ""),
+    "mail_from": ("MAIL_FROM", str, ""),
+    "oidc_enabled": ("OIDC_ENABLED", bool, False),
+    "oidc_issuer": ("OIDC_ISSUER", str, ""),
+    "oidc_client_id": ("OIDC_CLIENT_ID", str, ""),
+    "oidc_scope": ("OIDC_SCOPE", str, "openid profile email"),
+    "oidc_email_claim": ("OIDC_EMAIL_CLAIM", str, "email"),
+    "oidc_prompt": ("OIDC_PROMPT", str, ""),
+    "oidc_button_text": ("OIDC_BUTTON_TEXT", str, "Log in with OIDC"),
+}
+
+# Kutt reads these with defaults: an empty value would replace the default
+KEEP_DEFAULT_IF_EMPTY = {"OIDC_SCOPE", "OIDC_EMAIL_CLAIM", "OIDC_BUTTON_TEXT", "SITE_NAME", "LINK_CUSTOM_ALPHABET"}
+
+
+def env_value(value, kind):
+    if kind is bool:
+        return "true" if value else "false"
+    return str(value).strip()
+
+
+host = data["host"]
 agent.set_env("TRAEFIK_HOST", host)
-agent.set_env("TRAEFIK_HTTP2HTTPS", h2hs)
+agent.set_env("TRAEFIK_HTTP2HTTPS", data.get("http2https", True))
+if "lets_encrypt" in data:
+    agent.set_env("TRAEFIK_LETS_ENCRYPT", data["lets_encrypt"])
 
+kutt = {
+    "NODE_ENV": "production",
+    "PORT": "3000",
+    "SITE_NAME": "Kutt",
+    "DEFAULT_DOMAIN": host,
+    # Traefik is the only client: take the visitor address from it
+    "TRUST_PROXY": "true",
+    "DB_CLIENT": "pg",
+    "DB_HOST": "127.0.0.1",
+    "DB_PORT": "5432",
+    "DB_NAME": "kutt",
+    "DB_USER": "kutt",
+    "REDIS_ENABLED": "true",
+    "REDIS_HOST": "127.0.0.1",
+    "REDIS_PORT": "6379",
+}
 
-#This is specific to you module, so you need to change it accordingly.
-# we read a json stdin {"vars1":true, "var2":"foo", "vars3": 3} and we writ it to .config/state/environment
-# Upper case to set environment variable and minor case to read from stdin
+for key, (name, kind, default) in SETTINGS.items():
+    if key in data:
+        value = env_value(data[key], kind)
+    elif "KUTT_" + name in os.environ:
+        value = os.environ["KUTT_" + name]
+    else:
+        value = env_value(default, kind)
+    agent.set_env("KUTT_" + name, value)
+    if value == "" and name in KEEP_DEFAULT_IF_EMPTY:
+        continue
+    if name == "MAIL_FROM":
+        continue  # written by bin/discover-smarthost, with the mail settings
+    kutt[name] = value
 
-# this values must exists in the json stdin
-# agent.set_env("MAIL_SERVER", data["mail_server"])
-# agent.set_env("LDAP_DOMAIN", data["ldap_domain"])
+agent.write_envfile("kutt.env", kutt)
+os.chmod("kutt.env", 0o600)
 
-# you can add default values for the following variables
-# agent.set_env("MAIL_DOMAIN",data.get("mail_domain",""))
-# agent.set_env("WOWORKERSCOUNT",data.get("workers_count",3))
-# agent.set_env("AUXILIARYACCOUNT",data.get("auxiliary_account",True))
-# agent.set_env("ACTIVESYNC",data.get("activesync",False))
+# OIDC client secret: replace it only when a new one is given
+secret = data.get("oidc_client_secret", "")
+if secret:
+    passwords = agent.read_envfile("passwords.env")
+    passwords["OIDC_CLIENT_SECRET"] = secret
+    tmp = "passwords.env.tmp"
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as fp:
+        for key, value in passwords.items():
+            fp.write(f"{key}={value}\n")
+    os.replace(tmp, "passwords.env")
 
-
-# Make sure everything is saved inside the environment file
-# just before starting systemd unit
-#agent.dump_env()
